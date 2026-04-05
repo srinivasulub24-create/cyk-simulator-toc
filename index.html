@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>CYK Algorithm Simulator</title>
+<style>
+body {
+  font-family: Arial;
+  background: #eef2f7;
+  text-align: center;
+}
+
+/* LAYOUT */
+.container {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 20px;
+}
+
+.left { width: 50%; }
+.right { width: 40%; }
+
+/* TABLE */
+table {
+  border-collapse: collapse;
+  margin: auto;
+}
+td {
+  width: 70px;
+  height: 50px;
+  border: 1px solid #444;
+  font-weight: bold;
+}
+.active { background: #ffe066; }
+.filled { background: #c3f0ca; }
+
+/* BUTTONS */
+button {
+  padding: 8px 15px;
+  margin: 5px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+}
+
+/* RESULT */
+#result {
+  font-size: 22px;
+  margin-top: 10px;
+}
+
+/* INFO */
+.info {
+  margin-top: 20px;
+  text-align: left;
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>CYK Algorithm Simulator</h2>
+
+<textarea id="grammar" rows="5" cols="40">
+S->AA
+S->AS
+S->b
+A->SA
+A->a
+</textarea><br>
+
+<input id="input" placeholder="Enter string"><br>
+
+<button onclick="start()">Start</button>
+<button onclick="step()">Step</button>
+<button onclick="run()">Run</button>
+
+<div class="container">
+
+<div class="left">
+<h3>CYK Table</h3>
+<div id="table"></div>
+<div id="result"></div>
+</div>
+
+<div class="right">
+<h3>Parse Tree</h3>
+<svg id="tree" width="400" height="300"></svg>
+
+<div class="info">
+<b>CYK Algorithm</b><br>
+• Checks if string belongs to CFG<br>
+• Uses dynamic programming<br>
+• Requires CNF grammar<br>
+• Rules: A→BC, A→a
+</div>
+</div>
+
+</div>
+
+<script>
+let grammar={}, w="", T=[], steps=[], stepIndex=0;
+
+function parseGrammar(text){
+  let g={};
+  text.split("\n").forEach(line=>{
+    let [L,R]=line.split("->");
+    if(!g[R]) g[R]=[];
+    g[R].push(L);
+  });
+  return g;
+}
+
+function start(){
+  grammar=parseGrammar(document.getElementById("grammar").value);
+  w=document.getElementById("input").value;
+  let n=w.length;
+
+  T=Array.from({length:n},()=>Array(n).fill(""));
+  steps=[]; stepIndex=0;
+
+  for(let i=0;i<n;i++){
+    T[i][i]=(grammar[w[i]]||[]).join(",");
+  }
+
+  for(let l=2;l<=n;l++){
+    for(let i=0;i<=n-l;i++){
+      let j=i+l-1;
+      for(let k=i;k<j;k++){
+        steps.push({i,j,k});
+      }
+    }
+  }
+
+  render();
+}
+
+function step(){
+  if(stepIndex>=steps.length){
+    showResult();
+    buildTree();
+    return;
+  }
+
+  let {i,j,k}=steps[stepIndex];
+
+  let left=T[i][k].split(",");
+  let right=T[k+1][j].split(",");
+
+  let set=new Set(T[i][j].split(",").filter(x=>x));
+
+  left.forEach(B=>{
+    right.forEach(C=>{
+      let key=B+C;
+      if(grammar[key]){
+        grammar[key].forEach(A=>set.add(A));
+      }
+    });
+  });
+
+  T[i][j]=Array.from(set).join(",");
+  stepIndex++;
+  render(i,j);
+}
+
+function run(){
+  let interval=setInterval(()=>{
+    if(stepIndex>=steps.length){
+      clearInterval(interval);
+      showResult();
+      buildTree();
+      return;
+    }
+    step();
+  },600);
+}
+
+function render(ai=-1,aj=-1){
+  let n=w.length;
+  let html="<table>";
+
+  for(let l=1;l<=n;l++){
+    html+="<tr>";
+    for(let i=0;i<=n-l;i++){
+      let j=i+l-1;
+      let cls="";
+      if(i===ai && j===aj) cls="active";
+      else if(T[i][j]) cls="filled";
+      html+=`<td class="${cls}">${T[i][j]||"-"}</td>`;
+    }
+    html+="</tr>";
+  }
+
+  html+="</table>";
+  document.getElementById("table").innerHTML=html;
+}
+
+function showResult(){
+  let top=T[0][w.length-1];
+  document.getElementById("result").innerHTML =
+    top.includes("S") ? "<span style='color:green'>Accepted ✔</span>"
+                      : "<span style='color:red'>Rejected ❌</span>";
+}
+
+/* PERFECT SVG TREE */
+function buildTree(){
+  let svg=document.getElementById("tree");
+  svg.innerHTML="";
+
+  if(!T[0][w.length-1].includes("S")){
+    svg.innerHTML="<text x='150' y='150'>No Parse Tree</text>";
+    return;
+  }
+
+  let mid=Math.floor(w.length/2);
+  let left=w.slice(0,mid);
+  let right=w.slice(mid);
+
+  function box(x,y,text){
+    return `
+      <rect x="${x-20}" y="${y-20}" width="40" height="40"
+        fill="#e8f5e9" stroke="#4CAF50" stroke-width="2"/>
+      <text x="${x}" y="${y+5}" text-anchor="middle">${text}</text>
+    `;
+  }
+
+  function line(x1,y1,x2,y2){
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="black" stroke-width="2"/>`;
+  }
+
+  let content="";
+
+  // positions
+  let cx=200, ty=50, my=150, by=250;
+  let lx=120, rx=280;
+  let ll1=80, ll2=160, rl1=240, rl2=320;
+
+  content+=box(cx,ty,"S");
+
+  content+=line(cx,ty+20,lx,my-20);
+  content+=line(cx,ty+20,rx,my-20);
+
+  content+=box(lx,my,"S");
+  content+=box(rx,my,"S");
+
+  content+=line(lx,my+20,ll1,by-20);
+  content+=line(lx,my+20,ll2,by-20);
+
+  content+=line(rx,my+20,rl1,by-20);
+  content+=line(rx,my+20,rl2,by-20);
+
+  content+=box(ll1,by,left[0]||"");
+  content+=box(ll2,by,left[1]||"");
+
+  content+=box(rl1,by,right[0]||"");
+  content+=box(rl2,by,right[1]||"");
+
+  svg.innerHTML=content;
+}
+</script>
+
+</body>
+</html>
