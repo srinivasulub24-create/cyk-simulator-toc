@@ -29,4 +29,4 @@ This project implements the CYK (Cocke–Younger–Kasami) algorithm to check wh
 
 ## Author
 
-BANAVATH SRIVASULU
+BANAVATH SRINIVASULU
